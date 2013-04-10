@@ -1,9 +1,5 @@
-#!/Users/kfll/mgltools/bin/pythonsh
 # -*- coding: utf-8 -*- #
-import os
-import os.path
-import sys
-import getopt
+import os, sys, getopt
 from glob import glob
 from MolKit import Read
 from AutoDockTools.Docking import Docking
