@@ -2,7 +2,6 @@
 *.swp
 *~
 target/
-uncompleted/
 examples/data/
 *.pyc
 node_modules/
