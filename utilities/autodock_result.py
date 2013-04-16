@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*- #
 import os, sys, getopt
+from util import *
 from glob import glob
 from MolKit import Read
 from AutoDockTools.Docking import Docking
@@ -95,7 +96,7 @@ def parse_dlg(dlgfilename, num, result):
     for i in range(0, num):
         conf = clist[i]
         outfile = workdir + '/' + d.ligMol.name + '_' + str(i + 1) + '.pdb'
-        energy = '%.2f' % round(conf.energy, 2)
+        energy = conf.binding_energy
 
         mylog = {'name': outfile, 'energy': energy}
         if VERBOSE:

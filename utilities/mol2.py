@@ -2,6 +2,9 @@
 # and was spilted by '@<TRIPOS>MOLECULE'
 import re, md5, os
 def openMolecules(path):
+  if not path:
+    return []
+
   if type(path) is str:
     path = [path]
 
@@ -61,6 +64,7 @@ class Molecule:
     self.type = info[2].rstrip()
     self.charge_type = info[3].rstrip()
     self.data = mol2data
+    self.hash = md5.new(''.join(mol2data)).hexdigest()
     self.records = records
     self.headcomments = headcomments
     self.is_atom_dup = None
@@ -78,17 +82,10 @@ class Molecule:
     self.atoms = atoms
     self.atom_num = len(atoms)
 
-  def save(self, path, method):
-    hashv = md5.new(''.join(self.data)).hexdigest()
-    if method == 'molname':
-      path = '%s/%s_%s.mol2' % (path, self.name, hashv)
-    if method == 'md5':
-      path = '%s/%s.mol2' % (path, hashv)
-
+  def save(self, path):
     f = open(path, 'w')
     f.writelines(self.data)
     f.close()
-    return path
 
 class Atom:
   def __init__(self, atom_record):
