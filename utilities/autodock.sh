@@ -47,7 +47,7 @@ function existsfile {
   fi
   
   [ -f "$file" ] || {
-  echo "当前路径中的 txt 文件：$(ls *.txt)"
+    echo "当前路径中的 txt 文件：$(ls *.txt)"
     while read -p "${file} 不存在，请输入${comment}文件路径：" file; do
       [ -f "$file" ] && break
     done
@@ -126,6 +126,13 @@ function parsebox {
   done
 }
 
+# 获取数据
+# 1 工作路径 2 受体名 3 配体名
+function getbycoord {
+  cd $1
+  cat "$2.txt" 2>/dev/null | grep "^$3" | cut -d "," -f 2- || return 1
+}
+
 ############## Functions End ################
 
 ############## Works ########################
@@ -188,8 +195,8 @@ while read -p "指定工作目录：" workdir; do
     unset confirm
   else
     mkdir "$workdir"
-    mkdir -p "${workdir}/tmp"
   fi
+  mkdir -p "${workdir}/tmp"
   break
 done
 workdir=$(abs "$workdir")
@@ -203,16 +210,16 @@ current=$(pwd)
 # 开始工作
 echo "$reclist" | while read rec; do
   # 不含后缀的文件名
-  basename=`basename $rec .pdbqt`
+  recname=$(basename "$rec" ".pdbqt")
   # 文件路径+不含后缀的文件名
   basepath=${rec%\.*}
   # 盒子路径
   boxfile="${basepath}.gpf"
   # 工作路径
-  dest=$(relative "$basepath" "$recfile")
-  dest=${dest//[\/\\]/_}
-  recname="$dest"
-  dest="${workdir}/${dest}"
+  #dest=$(relative "$basepath" "$recfile")
+  #dest=${dest//[\/\\]/_}
+  #recname="$dest"
+  dest="${workdir}/${recname}"
   mkdir -p "$dest"
 
   # 进入工作目录
@@ -223,7 +230,7 @@ echo "$reclist" | while read rec; do
   # autogrid4
   trap "rm *.pdbqt; exit;" 2
   echo "[开始处理盒子]"
-  if ls *.map && ls *.maps.* && verifyglg "box.glg"; then
+  if ls *.map &>/dev/null && ls *.maps.* &>/dev/null && verifyglg "box.glg"; then
     echo "box.glg 早已生成，将不在重复生成。"
   else
     parsebox "$boxfile" "$rec" "$ligatoms" > "box.gpf"
@@ -234,8 +241,9 @@ echo "$reclist" | while read rec; do
 
   # prepare dpf & autodock4
   echo "$liglist" | while read lig; do
-    echo "[准备进行对接"$(basename "$rec" ".pdbqt")"]"
-    filename=$(basename "$lig" ".pdbqt")_$(basename "$rec" ".pdbqt")
+    ligname=$(basename "$lig" ".pdbqt")
+    filename=${ligname}_${recname}
+    echo "[准备进行对接${filename}]"
     if verifydlg "${filename}.dlg"; then
       echo "该分子对接已完成于 $(finishtime "${filename}.dlg") ，将不再重复进行对接。"
     else
@@ -250,7 +258,7 @@ echo "$reclist" | while read rec; do
 
   # 结果检查
   echo "[对接结果检查]"
-  ls *.dlg | while read dlg; do
+  ls *.dlg &>/dev/null | while read dlg; do
     verifydlg "$dlg" || { echo "${dlg} 为未完成状态，重命名为${dlg}.failed"; mv "$dlg" "${dlg}.failed"; }
   done
   echo "[对接结果检查结束]"
@@ -259,7 +267,7 @@ echo "$reclist" | while read rec; do
   echo "[排序]"
   $MGLHOME/bin/pythonsh "${current}/autodock_result.py" -n 1
   echo "[排序结束]"
-  cp "target/result.txt" "../tmp/${recname}.txt"
+  cp "target/result.txt" "../tmp/${recname}.txt" 2>/dev/null
 
   # 清理
   rm -f *.pdbqt
@@ -269,9 +277,21 @@ echo "$reclist" | while read rec; do
 done
 
 # 结合结果
-ls "${workdir}"/tmp/*.txt && {
-  
-}
+{
+echo "$liglist" | while read lig; do
+  ligname=$(basename "$lig" ".pdbqt")
+  printf ",${ligname}"
+done
+printf "\n"
 
-############ Works End #################
-
+echo "$reclist" | while read rec; do
+  recname=$(basename "$rec" ".pdbqt")
+  printf "$recname"
+  echo "$liglist" | while read lig; do
+    ligname=$(basename "$lig" ".pdbqt")
+    printf ","$(getbycoord "${workdir}/tmp" "$recname" "$ligname")
+  done
+  printf "\n"
+done
+} > ${workdir}/result.txt
+    
