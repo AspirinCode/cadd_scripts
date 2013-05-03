@@ -74,12 +74,18 @@ function getlist {
 
 # autogrid4 glg 完整性验证
 function verifyglg {
-  echo $(tail -n 2 "$1" | head -n 1 | awk '{print $2}')
+  local glgstatus
+  [ -f "$1" ] || return 1;
+  glgstatus=$(tail -n 2 "$1" | head -n 1 | awk '{print $2}')
+  [ "$glgstatus" == "Successful" ] || return 2;
 }
 
 # autodock4 dlg 完整性验证
 function verifydlg {
-  echo $(tail -n 5 "$1" | head -n 1 | awk '{print $2}')
+  local dlgstatus
+  [ -f "$1" ] || return 1;
+  dlgstatus=$(tail -n 5 "$1" | head -n 1 | awk '{print $2}')
+  [ "$dlgstatus" == "Successful" ] || return 2;
 }
 
 # dlg 完成时间
@@ -181,7 +187,8 @@ while read -p "指定工作目录：" workdir; do
     [ "$confirm" == "n" ] && continue
     unset confirm
   else
-    mkdir $workdir
+    mkdir "$workdir"
+    mkdir -p "${workdir}/tmp"
   fi
   break
 done
@@ -204,40 +211,67 @@ echo "$reclist" | while read rec; do
   # 工作路径
   dest=$(relative "$basepath" "$recfile")
   dest=${dest//[\/\\]/_}
+  recname="$dest"
   dest="${workdir}/${dest}"
   mkdir -p "$dest"
+
+  # 进入工作目录
   cd "$dest"
+  echo "[进入目录 ${dest}]"
   cp -f "$rec" ./
   
   # autogrid4
-  if [ -f "${dest}/box.glg" ] && [ "$(verifyglg ${dest}/box.glg)" == "Successful" ]; then
-    echo "${basepath} 的 autogrid 工作已完成，不再重复进行。"
+  trap "rm *.pdbqt; exit;" 2
+  echo "[开始处理盒子]"
+  if ls *.map && ls *.maps.* && verifyglg "box.glg"; then
+    echo "box.glg 早已生成，将不在重复生成。"
   else
-    echo "[处理盒子]${dest}"
-    parsebox "$boxfile" "$rec" "$ligatoms" > "${dest}/box.gpf"
-    autogrid4 -p "${dest}/box.gpf" -l "${dest}/box.glg"
-    glgstatus=$(verifyglg "${dest}/box.glg")
-    [ "$glgstatus" == "Successful" ] && echo "处理成功。" || echo "盒子处理貌似失败了，请检查 ${dest}/box.glg "
+    parsebox "$boxfile" "$rec" "$ligatoms" > "box.gpf"
+    autogrid4 -p "box.gpf" -l "box.glg"
+    verifyglg "box.glg" && echo "处理成功。" || { echo "盒子处理貌似失败了，重命名为box.glg.failed "; mv box.glg box.glg.failed; }
   fi
+  echo "[盒子处理结束]"
 
   # prepare dpf & autodock4
   echo "$liglist" | while read lig; do
+    echo "[准备进行对接"$(basename "$rec" ".pdbqt")"]"
     filename=$(basename "$lig" ".pdbqt")_$(basename "$rec" ".pdbqt")
-    if [ -f "${filename}.dlg" ] && [ "$(verifydlg ${filename}.dlg)" == "Successful" ]; then
+    if verifydlg "${filename}.dlg"; then
       echo "该分子对接已完成于 $(finishtime "${filename}.dlg") ，将不再重复进行对接。"
     else
-      echo "生成 ${filename}.dpf 中"
       cp -f "$lig" ./
       $MGLHOME/bin/pythonsh $MGLHOME/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_dpf4.py -l "$lig" -r "$rec" -p ga_pop_size=$pop_size -p ga_num_evals=$num_evals -p ga_run=$num_run > /dev/null
-      echo "${filename}.dpf 已生成，开始对接。"
+      echo "[${filename}.dpf 已生成]"
+      echo "[开始对接 ${filename}]"
       autodock4 -p "${filename}.dpf" -l "${filename}.dlg"
     fi
-    
+    echo "[${filename}对接结束]"
   done
 
+  # 结果检查
+  echo "[对接结果检查]"
+  ls *.dlg | while read dlg; do
+    verifydlg "$dlg" || { echo "${dlg} 为未完成状态，重命名为${dlg}.failed"; mv "$dlg" "${dlg}.failed"; }
+  done
+  echo "[对接结果检查结束]"
+
+  # 优势计算
+  echo "[排序]"
+  $MGLHOME/bin/pythonsh "${current}/autodock_result.py" -n 1
+  echo "[排序结束]"
+  cp "target/result.txt" "../tmp/${recname}.txt"
+
+  # 清理
+  rm -f *.pdbqt
+
+  # 离开工作目录
   cd "$current"
 done
 
+# 结合结果
+ls "${workdir}"/tmp/*.txt && {
+  
+}
 
 ############ Works End #################
 
