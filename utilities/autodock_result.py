@@ -85,8 +85,8 @@ def parse_dlg(dlgfilename, num, result):
       d.ligMol.parser.allLines[i] = line + "\n"
 
 
-  if not hasattr(d, 'Clusterer'):
-    d.clusterer = Clusterer(d.ch.conformations, sort='energy')
+  if not hasattr(d, 'clusterer'):
+    d.clusterer = Clusterer(d.ch.conformations, sort='binding_energy')
 
   clist = []
 
