@@ -221,18 +221,18 @@ echo "$lig_files" | while read lig; do
   }
 
   # prepare ligand
-  [ -f "${target}/dict/${lig_basename}.py" ] && [ -f "${target}/ligands/${lig_basename}.pdbqt" ] || {
+  [ -f "${target}/dict/dict${lig_basename}.py" ] && [ -f "${target}/ligands/${lig_basename}.pdbqt" ] || {
     if [ "$lig_ext" = "pdbqt" ]; then
       "cp" "-f" "$lig" "${target}/ligands/${lig_basename}.pdbqt"
-      "sh" "$PYTHON" "${MGLUTIL}/prepare_ligand_dict.py" "-l" "$lig" "-d" "${target}/dict/${lig_basename}.py"
+      "sh" "$PYTHON" "${MGLUTIL}/prepare_ligand_dict.py" "-l" "$lig" "-d" "${target}/dict/dict${lig_basename}.py"
     else
-      "sh" "$PYTHON" "${MGLUTIL}/prepare_ligand4.py" "-l" "$lig" "-o" "${target}/ligands/${lig_basename}.pdbqt" "-d" "${target}/dict/${lig_basename}.py" "-A" "bonds_hydrogens"
+      "sh" "$PYTHON" "${MGLUTIL}/prepare_ligand4.py" "-l" "$lig" "-o" "${target}/ligands/${lig_basename}.pdbqt" "-d" "${target}/dict/dict${lig_basename}.py" "-A" "hydrogens"
     fi
   }
 
   # check ligand (torsion and atom)
   cd "${target}/dict"
-  lig_info=$("python" "-c" "from ${lig_basename} import summary; k = summary['${lig_basename}']; print '%d' % k['rbonds']; print '\n'.join(k['atom_types'])")
+  lig_info=$("python" "-c" "from dict${lig_basename} import summary; k = summary['${lig_basename}']; print '%d' % k['rbonds']; print '\n'.join(k['atom_types'])")
   cd "${WORKDIR}"
 
   lig_torsion=$(echo "$lig_info" | head -n 1)
@@ -334,7 +334,7 @@ done
 
 [ "$ALLDONE" -eq 1 ] && {
   cd "${target}/docked"
-  cp -f "${CURRENTDIR}/result.py" "result.py"
+  ln -sf "${CURRENTDIR}/result.py" "result.py"
   "sh" "$PYTHON" "result.py"
 }
 exit 0
